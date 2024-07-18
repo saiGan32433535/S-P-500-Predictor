@@ -1,0 +1,268 @@
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from xgboost import XGBRegressor
+from lightgbm import LGBMRegressor
+from sklearn.svm import SVR
+df = pd.read_csv('/content/final s&P 500 complete dataset - Sheet1 (1).csv')
+
+#1) Percent change correlation
+
+df['Date'] = pd.to_datetime(df['Date'], format='%b %Y')
+#print(df.head())
+
+
+columns = ['Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume', 'Unemp Rate%', 'Interest Rates']
+
+for col in columns:
+    df[col] = df[col].astype(str).str.replace(',', '').astype(float)
+
+df['Pct_Change_Open'] = df['Open'].pct_change()
+df['Pct_Change_High'] = df['High'].pct_change()
+df['Pct_Change_Low'] = df['Low'].pct_change()
+df['Pct_Change_Close'] = df['Close'].pct_change()
+df['Pct_Change_Adj_Close'] = df['Adj Close'].pct_change()
+df['Pct_Change_Volume'] = df['Volume'].pct_change()
+df['Pct_Change_Unemp_Rate%'] = df['Unemp Rate%'].pct_change()
+df['Pct_Change_Interest_Rates'] = df['Interest Rates'].pct_change()
+
+secondDf = df
+
+print(df[['Date', 'Pct_Change_Open', 'Pct_Change_High', 'Pct_Change_Low', 'Pct_Change_Close', 'Pct_Change_Adj_Close', 'Pct_Change_Volume', 'Pct_Change_Unemp_Rate%', 'Pct_Change_Interest_Rates']].head())
+
+correlation_economic = df[['Pct_Change_Open', 'Pct_Change_High', 'Pct_Change_Low', 'Pct_Change_Close', 'Pct_Change_Adj_Close', 'Pct_Change_Volume', 'Pct_Change_Unemp_Rate%', 'Pct_Change_Interest_Rates']].corr()
+
+print()
+print('This is the economic correlation \n')
+print(correlation_economic)
+
+# 2) Moving Average
+
+print('Moving average')
+secondDf
+secondDf['RM_Open'] = secondDf['Open'].rolling(window=20).mean()
+secondDf['RM_High'] = secondDf['High'].rolling(window=20).mean()
+secondDf['RM_Low'] = secondDf['Close'].rolling(window=20).mean()
+secondDf['RM_Close'] = secondDf['Low'].rolling(window=20).mean()
+secondDf['RM_Adj_Close'] = secondDf['Adj Close'].rolling(window=20).mean()
+secondDf['RM_Volume'] = secondDf['Volume'].rolling(window=20).mean()
+secondDf['RM_Unemp'] = secondDf['Unemp Rate%'].rolling(window=20).mean()
+secondDf['RM_Intrest'] = secondDf['Interest Rates'].rolling(window=20).mean()
+
+print(secondDf[['Date', 'RM_Open', 'RM_High', 'RM_Low', 'RM_Close', 'RM_Adj_Close', 'RM_Volume', 'RM_Unemp', 'RM_Intrest']])
+secondDf.plot(x='Date', y=['RM_Open', 'RM_High', 'RM_Low', 'RM_Close', 'RM_Adj_Close','RM_Unemp', 'RM_Intrest'])
+secondDf.plot(x='Date', y=['RM_Volume'])
+analysis_std = {col: df[col].std() for col in columns}
+
+#3) Min &Max
+analysis = {}
+
+for col in columns:
+    max_value = df[col].max()
+    min_value = df[col].min()
+    max_date = df.loc[df[col] == max_value, 'Date'].iloc[0].strftime('%Y-%m-%d')
+    min_date = df.loc[df[col] == min_value, 'Date'].iloc[0].strftime('%Y-%m-%d')
+    analysis[col] = {
+        'Maximum': f"{max_date} ${max_value}",
+        'Minimum': f"{min_date} ${min_value}"
+    }
+
+for col, values in analysis.items():
+    analysis.items()
+    print(f"{col}:")
+    print(f"  Max: {values['Maximum']}")
+    print(f"  Min: {values['Minimum']}")
+
+# 4)Standard Dev
+
+print("Standard Deviations:")
+for col, std in analysis_std.items():
+    print(f"{col}: {std}")
+
+
+
+# 5) Prediction model 1
+
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from xgboost import XGBRegressor
+from lightgbm import LGBMRegressor
+from sklearn.svm import SVR
+from sklearn.metrics import mean_squared_error
+
+
+
+df.dropna(inplace=True)
+
+avg_growth_rates = {col: df[f'Pct_Change_{col.replace(" ", "_")}'].mean() for col in columns}
+
+Independent = ['Pct_Change_Open', 'Pct_Change_Volume', 'Pct_Change_Close', 'Pct_Change_Adj_Close']
+Dependent = ['Open', 'Volume', 'Close']
+
+X = df[Independent]
+y = df[Dependent]
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+models = {
+    "Linear Regression": LinearRegression(),
+    "Random Forest Regressor": RandomForestRegressor(),
+    "Gradient Boosting Regressor": GradientBoostingRegressor(),
+    "XGBoost": XGBRegressor(),
+    "LightGBM": LGBMRegressor(),
+    "Support Vector Regressor": SVR()
+}
+
+predict_model = LinearRegression()
+predict_model.fit(X_train, y_train)
+
+def predict_sp500_values():
+    recent_data = df.iloc[-1]
+
+    predicted_values = {
+        'Open': recent_data['Open'] * (1 + avg_growth_rates['Open'] / 100),
+        'Volume': recent_data['Volume'] * (1 + avg_growth_rates['Volume'] / 100),
+        'Close': recent_data['Close'] * (1 + avg_growth_rates['Close'] / 100),
+    }
+
+    return predicted_values
+
+def userinteraction():
+    predicted_values = predict_sp500_values()
+    print(f"\nPredicted S&P 500 values for August 2024:")
+    for key, value in predicted_values.items():
+        print(f"{key}: ${value:.2f}")
+
+if __name__ == "__main__":
+    userinteraction()
+
+
+# 6) Prediction model 2
+
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from xgboost import XGBRegressor
+from lightgbm import LGBMRegressor
+from sklearn.svm import SVR
+from sklearn.metrics import mean_squared_error
+from datetime import timedelta
+
+df.dropna(inplace=True)
+
+
+df['Date'] = pd.to_datetime(df['Date'])
+
+avg_pct_change_effects = {
+    'Open': df['Pct_Change_Open'].mean(),
+    'Close': df['Pct_Change_Close'].mean(),
+    'Adj_Close': df['Pct_Change_Adj_Close'].mean()
+}
+
+Indepentdent = ['Pct_Change_Unemp_Rate%', 'Pct_Change_Interest_Rates']
+Dependent = ['Pct_Change_Open', 'Pct_Change_Close', 'Pct_Change_Adj_Close']
+
+X = df[Indepentdent]
+y = df[Dependent]
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+models = {
+    "Linear Regression": LinearRegression(),
+    "Random Forest Regressor": RandomForestRegressor(),
+    "Gradient Boosting Regressor": GradientBoostingRegressor(),
+    "XGBoost": XGBRegressor(),
+    "LightGBM": LGBMRegressor(),
+    "Support Vector Regressor": SVR()
+}
+
+predict_model = LinearRegression()
+predict_model.fit(X_train, y_train)
+
+def predict_sp500_values(unemp_rate, interest_rate, months=2):
+    recent_data = df.iloc[-1]
+
+    unemp_rate_effect = (unemp_rate - recent_data['Unemp Rate%']) / recent_data['Unemp Rate%'] * 100
+    interest_rate_effect = (interest_rate - recent_data['Interest Rates']) / recent_data['Interest Rates'] * 100
+
+    predictions = []
+
+    for month in range(months):
+        user_input = pd.DataFrame({
+            'Pct_Change_Unemp_Rate%': [unemp_rate_effect],
+            'Pct_Change_Interest_Rates': [interest_rate_effect]
+        })
+
+        predicted_pct_changes = best_model.predict(user_input)
+
+        predicted_values = {
+            'Open': recent_data['Open'] * (1 + predicted_pct_changes[0][0] / 100) * (1 + avg_pct_change_effects['Open'] / 100),
+            'Close': recent_data['Close'] * (1 + predicted_pct_changes[0][1] / 100) * (1 + avg_pct_change_effects['Close'] / 100),
+            'Adj Close': recent_data['Adj Close'] * (1 + predicted_pct_changes[0][2] / 100) * (1 + avg_pct_change_effects['Adj_Close'] / 100)
+        }
+
+        predictions.append(predicted_values)
+        recent_data = pd.Series(predicted_values)
+
+    return predictions
+
+def plot_predictions(predicted_values):
+    historical_data = df[['Date', 'Open', 'Close', 'Adj Close']].tail(50)
+    dates = list(historical_data['Date'])
+
+    for month in range(len(predicted_values)):
+        next_date = dates[-1] + timedelta(days=30)
+        dates.append(next_date)
+
+    open_values = list(historical_data['Open'])
+    close_values = list(historical_data['Close'])
+    adj_close_values = list(historical_data['Adj Close'])
+
+    for prediction in predicted_values:
+        open_values.append(prediction['Open'])
+        close_values.append(prediction['Close'])
+        adj_close_values.append(prediction['Adj Close'])
+
+    plt.figure(figsize=(14, 7))
+    plt.plot(dates, open_values, label='Open')
+    plt.plot(dates, close_values, label='Close')
+    plt.plot(dates, adj_close_values, label='Adj Close')
+
+    plt.scatter(dates[-len(predicted_values):], [v['Open'] for v in predicted_values], color='blue', label='Predicted Open', zorder=5)
+    plt.scatter(dates[-len(predicted_values):], [v['Close'] for v in predicted_values], color='orange', label='Predicted Close', zorder=5)
+    plt.scatter(dates[-len(predicted_values):], [v['Adj Close'] for v in predicted_values], color='green', label='Predicted Adj Close', zorder=5)
+
+    plt.xlabel('Date')
+    plt.ylabel('Value')
+    plt.title('S&P 500 Predictions')
+    plt.legend()
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.show()
+
+def userinteraction():
+    print("Enter the current Unemployment Rate (%):")
+    unemp_rate = float(input().strip())
+
+    print("Enter the current Interest Rate (%):")
+    interest_rate = float(input().strip())
+
+    print("Enter the number of months to predict:")
+    months = int(input().strip())
+
+    predicted_values = predict_sp500_values(unemp_rate, interest_rate, months)
+    print(f"\nPredicted S&P 500 values for the next {months} months:")
+    for i, prediction in enumerate(predicted_values):
+        print(f"Month {i+1}:")
+        for key, value in prediction.items():
+            print(f"  {key}: ${value:.2f}")
+
+    plot_predictions(predicted_values)
+
+if __name__ == "__main__":
+    userinteraction()
